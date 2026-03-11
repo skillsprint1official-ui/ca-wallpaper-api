@@ -1,166 +1,145 @@
-const { createCanvas } = require('canvas');
+import { ImageResponse } from '@vercel/og';
 
-module.exports = async (req, res) => {
-  try {
-    const {
-      goal = 'CA Foundation',
-      goal_date = '2026-05-14',
-      start_date = '2025-03-11',
-      width = 1080,
-      height = 2340,
-    } = req.query;
+export const config = { runtime: 'edge' };
 
-    const W = parseInt(width);
-    const H = parseInt(height);
+export default async function handler(req) {
+  const { searchParams } = new URL(req.url);
+  
+  const goal       = searchParams.get('goal')       || 'CA Foundation';
+  const goal_date  = searchParams.get('goal_date')  || '2026-05-14';
+  const start_date = searchParams.get('start_date') || '2025-03-11';
+  const W          = parseInt(searchParams.get('width')  || '1080');
+  const H          = parseInt(searchParams.get('height') || '2340');
 
-    const START = new Date(start_date); START.setHours(0,0,0,0);
-    const EXAM  = new Date(goal_date);  EXAM.setHours(0,0,0,0);
-    const TODAY = new Date();           TODAY.setHours(0,0,0,0);
+  const START = new Date(start_date); START.setUTCHours(0,0,0,0);
+  const EXAM  = new Date(goal_date);  EXAM.setUTCHours(0,0,0,0);
+  const TODAY = new Date();
+  TODAY.setUTCHours(0,0,0,0);
 
-    const MS       = 86400000;
-    const daysLeft = Math.max(0, Math.round((EXAM - TODAY) / MS));
-    const total    = Math.round((EXAM - START) / MS);
-    const gone     = Math.min(total, Math.max(0, Math.round((TODAY - START) / MS)));
-    const pct      = total > 0 ? Math.round((gone / total) * 100) : 0;
+  const MS       = 86400000;
+  const daysLeft = Math.max(0, Math.round((EXAM - TODAY) / MS));
+  const total    = Math.round((EXAM - START) / MS);
+  const gone     = Math.min(total, Math.max(0, Math.round((TODAY - START) / MS)));
+  const pct      = total > 0 ? Math.round((gone / total) * 100) : 0;
 
-    const DNAMES = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
-    const MNAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-    const dateStr = DNAMES[TODAY.getDay()] + ', ' +
-                    String(TODAY.getDate()).padStart(2,'0') + ' ' +
-                    MNAMES[TODAY.getMonth()];
+  const DNAMES = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const MNAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const dateStr = `${DNAMES[TODAY.getUTCDay()]}, ${String(TODAY.getUTCDate()).padStart(2,'0')} ${MNAMES[TODAY.getUTCMonth()]}`;
+  const examStr = `${MNAMES[EXAM.getUTCMonth()]} ${String(EXAM.getUTCDate()).padStart(2,'0')}, ${EXAM.getUTCFullYear()}`;
 
-    const examStr = MNAMES[EXAM.getMonth()] + ' ' +
-                    String(EXAM.getDate()).padStart(2,'0') + ', ' +
-                    EXAM.getFullYear();
-
-    function getStatus(d) {
-      if(d <= 0)  return 'EXAM DAY. JAI HO!';
-      if(d <= 3)  return 'LAST FEW DAYS. ALL IN.';
-      if(d <= 7)  return 'FINAL WEEK. LOCK IN.';
-      if(d <= 14) return 'TWO WEEKS. NO BREAKS.';
-      if(d <= 30) return 'LAST MONTH. GRIND.';
-      if(d <= 60) return 'GRIND SEASON.';
-      if(d <= 90) return 'BUILD THE HABIT NOW.';
-      return 'EARLY START = BIG LEAD.';
-    }
-
-    const numColor = daysLeft <= 7 ? '#e05555' : daysLeft <= 30 ? '#e0a030' : '#c8a96e';
-
-    // ── CREATE CANVAS ──
-    const canvas = createCanvas(W, H);
-    const ctx    = canvas.getContext('2d');
-
-    // Background
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, W, H);
-
-    // Subtle noise
-    for(let i = 0; i < 5000; i++) {
-      ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.012})`;
-      ctx.fillRect(Math.random() * W, Math.random() * H, 1, 1);
-    }
-
-    ctx.textAlign = 'center';
-
-    // ── DATE ──
-    ctx.font = 'bold 58px sans-serif';
-    ctx.fillStyle = '#1e1e1e';
-    ctx.fillText(dateStr, W/2, H * 0.09);
-
-    // ── GOAL NAME ──
-    ctx.font = 'bold 52px sans-serif';
-    ctx.fillStyle = '#c8a96e33';
-    ctx.fillText(goal.toUpperCase(), W/2, H * 0.14);
-
-    // ── DAYS REMAINING LABEL ──
-    ctx.font = '400 32px sans-serif';
-    ctx.fillStyle = '#1c1c1c';
-    ctx.fillText('DAYS  REMAINING', W/2, H * 0.25);
-
-    // ── BIG NUMBER ──
-    const numSize = W * 0.62;
-    ctx.font = `bold ${numSize}px sans-serif`;
-    ctx.fillStyle = numColor;
-    ctx.shadowColor = numColor;
-    ctx.shadowBlur = 60;
-    ctx.fillText(String(daysLeft), W/2, H * 0.52);
-    ctx.shadowBlur = 0;
-
-    // ── STATUS ──
-    ctx.font = 'bold 44px sans-serif';
-    ctx.fillStyle = '#222222';
-    ctx.fillText(getStatus(daysLeft), W/2, H * 0.55);
-
-    // ── DIVIDER ──
-    ctx.strokeStyle = '#0e0e0e';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(W * 0.2, H * 0.57);
-    ctx.lineTo(W * 0.8, H * 0.57);
-    ctx.stroke();
-
-    // ── CIRCLES GRID ──
-    const cols   = 18;
-    const dotR   = Math.floor((W * 0.82) / (cols * 2 + cols - 1) / 2);
-    const gapDot = dotR;
-    const gridW  = cols * (dotR * 2 + gapDot) - gapDot;
-    let   cx     = (W - gridW) / 2 + dotR;
-    let   cy     = H * 0.615;
-
-    for(let i = 0; i < total; i++) {
-      if(i > 0 && i % cols === 0) {
-        cy += dotR * 2 + gapDot;
-        cx = (W - gridW) / 2 + dotR;
-      }
-      if(i < gone) {
-        ctx.fillStyle = '#c8a96e';
-      } else if(i === gone) {
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 14;
-      } else {
-        ctx.fillStyle = '#191919';
-      }
-      ctx.beginPath();
-      ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      cx += dotR * 2 + gapDot;
-    }
-
-    // ── PROGRESS BAR ──
-    const barY = cy + dotR + 60;
-    const barW = W * 0.55;
-    const barH = 4;
-    const barX = (W - barW) / 2;
-
-    ctx.fillStyle = '#111';
-    ctx.beginPath();
-    ctx.roundRect(barX, barY, barW, barH, 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#c8a96e';
-    ctx.beginPath();
-    ctx.roundRect(barX, barY, barW * (pct/100), barH, 2);
-    ctx.fill();
-
-    ctx.font = '400 26px sans-serif';
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillText(pct + '% PREP DONE', W/2, barY + 46);
-
-    // ── EXAM TAG ──
-    ctx.font = '400 28px sans-serif';
-    ctx.fillStyle = '#111';
-    ctx.fillText('TARGET · ' + examStr, W/2, H - 90);
-
-    // ── SEND PNG ──
-    const buffer = canvas.toBuffer('image/png');
-    res.setHeader('Content-Type', 'image/png');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Content-Disposition', 'inline; filename="ca-wallpaper.png"');
-    res.status(200).send(buffer);
-
-  } catch(err) {
-    res.status(500).json({ error: err.message });
+  function getStatus(d) {
+    if(d<=0)  return 'EXAM DAY. JAI HO!';
+    if(d<=3)  return 'LAST FEW DAYS. ALL IN.';
+    if(d<=7)  return 'FINAL WEEK. LOCK IN.';
+    if(d<=14) return 'TWO WEEKS. NO BREAKS.';
+    if(d<=30) return 'LAST MONTH. GRIND.';
+    if(d<=60) return 'GRIND SEASON.';
+    if(d<=90) return 'BUILD THE HABIT NOW.';
+    return 'EARLY START = BIG LEAD.';
   }
-};
+
+  const numColor = daysLeft<=7 ? '#e05555' : daysLeft<=30 ? '#e0a030' : '#c8a96e';
+
+  // Build circle rows — 18 per row
+  const COLS = 18;
+  const dotSize = 24;
+  const dotGap  = 8;
+  const rows = [];
+  for(let i = 0; i < total; i += COLS) {
+    rows.push(Array.from({length: Math.min(COLS, total-i)}, (_,j) => {
+      const idx = i+j;
+      return {
+        color:   idx < gone ? '#c8a96e' : idx === gone ? '#ffffff' : '#1e1e1e',
+        isToday: idx === gone,
+      };
+    }));
+  }
+
+  const scale = W / 1080;
+
+  return new ImageResponse(
+    <div style={{
+      width: `${W}px`, height: `${H}px`,
+      background: '#000000',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'space-between',
+      padding: `${120*scale}px ${40*scale}px ${100*scale}px`,
+    }}>
+
+      {/* DATE */}
+      <div style={{
+        fontSize: 58*scale, color: '#222', fontWeight: 900,
+        letterSpacing: 14*scale,
+      }}>
+        {dateStr}
+      </div>
+
+      {/* CENTER — big number */}
+      <div style={{display:'flex', flexDirection:'column', alignItems:'center'}}>
+        <div style={{
+          fontSize: 26*scale, color: '#181818',
+          letterSpacing: 12*scale, marginBottom: 20*scale,
+        }}>
+          DAYS REMAINING
+        </div>
+        <div style={{
+          fontSize: 580*scale, color: numColor,
+          fontWeight: 900, lineHeight: 0.85,
+          letterSpacing: -8*scale,
+        }}>
+          {daysLeft}
+        </div>
+        <div style={{
+          fontSize: 42*scale, color: '#1e1e1e',
+          fontWeight: 900, letterSpacing: 6*scale,
+          marginTop: 20*scale,
+        }}>
+          {getStatus(daysLeft)}
+        </div>
+      </div>
+
+      {/* CIRCLES */}
+      <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap: `${dotGap*scale}px`}}>
+        <div style={{fontSize: 18*scale, color:'#141414', letterSpacing: 5*scale, marginBottom: 8*scale}}>
+          ● GONE  ◉ TODAY  ○ LEFT
+        </div>
+        {rows.map((row, ri) => (
+          <div key={ri} style={{display:'flex', flexDirection:'row', gap:`${dotGap*scale}px`}}>
+            {row.map((c, ci) => (
+              <div key={ci} style={{
+                width:  `${dotSize*scale}px`,
+                height: `${dotSize*scale}px`,
+                borderRadius: '50%',
+                background: c.color,
+                boxShadow: c.isToday ? `0 0 ${12*scale}px #fff` : 'none',
+              }}/>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* PROGRESS + TARGET */}
+      <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:`${10*scale}px`, width:'100%'}}>
+        {/* bar */}
+        <div style={{width:`${560*scale}px`, height:`${4*scale}px`, background:'#111', borderRadius:`${2*scale}px`}}>
+          <div style={{width:`${pct}%`, height:'100%', background:'#c8a96e', borderRadius:`${2*scale}px`}}/>
+        </div>
+        <div style={{fontSize: 22*scale, color:'#1a1a1a', letterSpacing: 4*scale}}>
+          {pct}% PREP DONE
+        </div>
+        <div style={{fontSize: 24*scale, color:'#111', letterSpacing: 6*scale, marginTop: 10*scale}}>
+          TARGET · {examStr}
+        </div>
+      </div>
+
+    </div>,
+    {
+      width: W,
+      height: H,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Content-Disposition': 'inline; filename="ca-wallpaper.png"',
+      }
+    }
+  );
+}
